@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Layered Text Hover Effect</title>
+  <style>
+    /* Container for the text layers */
+    .text-container {
+      position: relative;
+      display: inline-block;
+      font-size: 48px;
+      font-weight: bold;
+      cursor: pointer;
+    }
+
+    /* Base styles for all text layers */
+    .text-layer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    /* Layer-specific colors */
+    .layer1 { color: black; }
+    .layer2 { color: red; }
+    .layer3 { color: darkgreen; }
+
+    /* Background colors */
+    .bg1 { background-color: white; }
+    .bg2 { background-color: white; }
+    .bg3 { background-color: lightgreen; }
+  </style>
+</head>
+<body>
+  <div class="text-container" id="textContainer">
+    <div class="text-layer layer1 bg1">HELLYO</div>
+    <div class="text-layer layer2 bg2">WORLD</div>
+    <div class="text-layer layer3 bg3">Yes Mo</div>
+  </div>
+
+  <script>
+    // JavaScript to handle hover sequence
+    document.addEventListener('DOMContentLoaded', () => {
+      const textContainer = document.getElementById('textContainer');
+      const layers = textContainer.getElementsByClassName('text-layer');
+      let currentLayer = 0;
+
+      textContainer.addEventListener('mouseover', () => {
+        // Hide the current layer
+        layers[currentLayer].style.opacity = '0';
+
+        // Move to the next layer
+        currentLayer = (currentLayer + 1) % layers.length;
+
+        // Show the next layer
+        layers[currentLayer].style.opacity = '1';
+      });
+    });
+  </script>
+</body>
+</html>

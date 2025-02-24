@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Responsive Pixel Art: Dynamic Text</title>
+  <style>
+    /* The container fills the viewport (or can be styled as needed) */
+    .container {
+      width: 100%;
+      height: 100vh;
+      position: relative;
+    }
+    /* The pixel canvas fills the container; its size is set dynamically */
+    #pixelCanvas {
+      position: relative;
+      /* Optional CSS border */
+      /* border: 20px solid #000; */
+    }
+    .pixel {
+      position: absolute;
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="pixelCanvas"></div>
+  </div>
+  
+  <!-- Include your custom Figlet.js (ensure figlet.js is available) -->
+  <script src="figlet.js" defer></script>
+  
+  <script>
+    // The text to render.
+    const textToRender = "HELLYO";
+    // Additional border thickness (in pixel blocks) to add around the text.
+    const BORDER_THICKNESS = 1;
+    
+    // Color variables for easy customization.
+    const BACKGROUND_COLOR = "black";  // Background (and border) color
+    const LETTER_COLOR = "white";      // Color for the letters
+    
+    const canvas = document.getElementById("pixelCanvas");
+    const container = document.querySelector(".container");
+    
+    // Global variables to store the ASCII art lines and its maximum width.
+    let asciiLines = [];
+    let artMaxWidth = 0;
+    
+    // Render the pixel grid into the canvas.
+    function renderCanvas() {
+      if (!asciiLines.length) return;
+      
+      // Calculate total grid dimensions including the extra border.
+      const totalCols = artMaxWidth + 2 * BORDER_THICKNESS;
+      const totalRows = asciiLines.length + 2 * BORDER_THICKNESS;
+      
+      // Measure the container dimensions.
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+      
+      // Determine the pixel size so the entire grid fits within the container.
+      const PIXEL_SIZE = Math.min(containerWidth / totalCols, containerHeight / totalRows);
+      
+      // Set canvas dimensions.
+      canvas.style.width = (totalCols * PIXEL_SIZE) + "px";
+      canvas.style.height = (totalRows * PIXEL_SIZE) + "px";
+      
+      // Clear any existing content.
+      canvas.innerHTML = "";
+      
+      // Build the grid of pixel divs.
+      for (let r = 0; r < totalRows; r++) {
+        for (let c = 0; c < totalCols; c++) {
+          const pixel = document.createElement("div");
+          pixel.className = "pixel";
+          pixel.style.top = (r * PIXEL_SIZE) + "px";
+          pixel.style.left = (c * PIXEL_SIZE) + "px";
+          pixel.style.width = PIXEL_SIZE + "px";
+          pixel.style.height = PIXEL_SIZE + "px";
+          
+          // Determine whether this cell is part of the border.
+          if (r < BORDER_THICKNESS || r >= BORDER_THICKNESS + asciiLines.length ||
+              c < BORDER_THICKNESS || c >= BORDER_THICKNESS + artMaxWidth) {
+            pixel.style.backgroundColor = BACKGROUND_COLOR;
+          } else {
+            // Otherwise, use the ASCII art to determine pixel color.
+            const textRow = r - BORDER_THICKNESS;
+            const textCol = c - BORDER_THICKNESS;
+            const char = asciiLines[textRow][textCol] || " ";
+            pixel.style.backgroundColor = (char === " " ? BACKGROUND_COLOR : LETTER_COLOR);
+          }
+          
+          // Toggle pixel color on mouseover.
+          pixel.addEventListener("mouseover", function() {
+            this.style.backgroundColor = (this.style.backgroundColor === LETTER_COLOR ? BACKGROUND_COLOR : LETTER_COLOR);
+          });
+          canvas.appendChild(pixel);
+        }
+      }
+    }
+    
+    // Initialize the ASCII art using Figlet.
+    function initArt() {
+      fetch("https://raw.githubusercontent.com/patorjk/figlet.js/refs/heads/main/fonts/ANSI%20Regular.flf")
+        .then(response => response.text())
+        .then(fontData => {
+          var fig = new Figlet();
+          fig.load(fontData);
+          const asciiText = fig.getText(textToRender);
+          asciiLines = asciiText.split("\n").filter(line => line.trim().length > 0);
+          
+          artMaxWidth = 0;
+          asciiLines.forEach(line => {
+            if (line.length > artMaxWidth) artMaxWidth = line.length;
+          });
+          
+          // Render the canvas initially.
+          renderCanvas();
+        })
+        .catch(error => console.error("Error loading font:", error));
+    }
+    
+    // Initialize the art.
+    initArt();
+    
+    // Re-render the canvas when the window is resized.
+    window.addEventListener("resize", renderCanvas);
+  </script>
+</body>
+</html>

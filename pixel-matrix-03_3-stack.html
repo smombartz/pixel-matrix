@@ -1,0 +1,215 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Layered Pixel Art – Custom Cycle with Option</title>
+  <style>
+    /* The container fills the viewport */
+    .container {
+      width: 100%;
+      height: 100vh;
+      position: relative;
+    }
+    /* The pixel canvas is positioned relative inside the container */
+    #pixelCanvas {
+      position: relative;
+    }
+    .pixel {
+      position: absolute;
+      box-sizing: border-box;
+      cursor: pointer;
+      transition: transform 500ms, opacity 500ms;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="pixelCanvas"></div>
+  </div>
+  
+  <!-- Include Figlet.js – ensure figlet.js is accessible -->
+  <script src="figlet.js" defer></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.8.1/socket.io.min.js" defer></script>
+  <script src="multiplayer.js" defer></script>
+
+
+  <script>
+    /******** Configuration Variables ********/
+    // Two texts for our two layers.
+    const textLayer01 = "HELLYO";  // layer01 text
+    const textLayer02 = "WORLD";   // layer02 text
+
+    // Color definitions:
+    // l1: layer01, l2: layer02; "BG" indicates off/background; "LTR" indicates letter (on) color.
+    const L1_LTR = "black";    // layer01 letter color
+    const L1_BG  = "white";  // layer01 background color
+    const L2_LTR = "red";      // layer02 letter color
+    const L2_BG  = "black";  // layer02 background color
+
+    // Extra border thickness in pixel blocks (extra rows/columns around the art)
+    const BORDER_THICKNESS = 1;
+
+    // Hover effect variables.
+    const HOVER_OPACITY = 0.5; // 50% opacity when hovered
+    const HOVER_SCALE = 1.4;   // 110% size when hovered
+
+    // Option to show layer2 background on load.
+    // Set to false so that on initial load, even pixels that belong to layer2 show as L1_BG.
+    const SHOW_LAYER2_ON_LOAD = false;
+
+    /******** Global Variables ********/
+    const canvas = document.getElementById("pixelCanvas");
+    const container = document.querySelector(".container");
+
+    // Arrays to store the ASCII art for each layer.
+    let asciiLayer01 = [];
+    let asciiLayer02 = [];
+    let totalRows = 0, totalCols = 0;
+
+    /******** Utility: Pad an ASCII art array to a specified number of rows and columns ********/
+    function padAsciiArray(asciiArray, rows, cols) {
+      let padded = [];
+      for (let r = 0; r < rows; r++) {
+        let line = r < asciiArray.length ? asciiArray[r] : "";
+        if (line.length < cols) {
+          line = line.padEnd(cols, " ");
+        }
+        padded.push(line);
+      }
+      return padded;
+    }
+
+    /******** Render the Responsive Pixel Grid ********/
+    function renderCanvas() {
+      // Ensure the ASCII layers are loaded.
+      if (!asciiLayer01.length || !asciiLayer02.length) return;
+
+      // Get the dimensions of the ASCII art.
+      totalRows = asciiLayer01.length;
+      totalCols = asciiLayer01[0].length;
+
+      // Compute grid dimensions (adding a border on all sides).
+      const gridRows = totalRows + 2 * BORDER_THICKNESS;
+      const gridCols = totalCols + 2 * BORDER_THICKNESS;
+
+      // Determine the available container size.
+      const containerWidth = container.clientWidth;
+      const containerHeight = container.clientHeight;
+
+      // Calculate the pixel size so the whole grid fits inside the container.
+      const PIXEL_SIZE = Math.min(containerWidth / gridCols, containerHeight / gridRows);
+
+      // Set canvas dimensions.
+      canvas.style.width = (gridCols * PIXEL_SIZE) + "px";
+      canvas.style.height = (gridRows * PIXEL_SIZE) + "px";
+
+      // Clear previous pixels.
+      canvas.innerHTML = "";
+
+      // Build the grid.
+      for (let r = 0; r < gridRows; r++) {
+        for (let c = 0; c < gridCols; c++) {
+          const pixel = document.createElement("div");
+          pixel.className = "pixel";
+          pixel.style.top = (r * PIXEL_SIZE) + "px";
+          pixel.style.left = (c * PIXEL_SIZE) + "px";
+          pixel.style.width = PIXEL_SIZE + "px";
+          pixel.style.height = PIXEL_SIZE + "px";
+
+          let cycleStates = [];
+          // Check if this cell is in the extra border.
+          if (r < BORDER_THICKNESS || r >= BORDER_THICKNESS + totalRows ||
+              c < BORDER_THICKNESS || c >= BORDER_THICKNESS + totalCols) {
+            // Type A: background in both.
+            cycleStates = [L1_BG, L2_BG];
+          } else {
+            // Map grid coordinates to the ASCII art coordinates.
+            const textRow = r - BORDER_THICKNESS;
+            const textCol = c - BORDER_THICKNESS;
+            const hasL1 = (asciiLayer01[textRow][textCol] !== " ");
+            const hasL2 = (asciiLayer02[textRow][textCol] !== " ");
+
+            // Determine cycle type:
+            if (!hasL1 && !hasL2) {
+              // Type A: background in both.
+              cycleStates = [L1_BG, L2_BG];
+            } else if (hasL1 && !hasL2) {
+              // Type B: letter only in layer01.
+              cycleStates = [L1_LTR, L1_BG];
+            } else if (!hasL1 && hasL2) {
+              // Type C: letter only in layer02.
+              // If SHOW_LAYER2_ON_LOAD is false, show L1_BG on initial load.
+              cycleStates = SHOW_LAYER2_ON_LOAD ? [L2_BG, L2_LTR] : [L1_BG, L2_LTR];
+            } else if (hasL1 && hasL2) {
+              // Type D: letters in both layers.
+              cycleStates = [L1_LTR, L2_LTR];
+            }
+          }
+
+          // Store the cycle states and initialize cycle index.
+          pixel.dataset.states = JSON.stringify(cycleStates);
+          pixel.dataset.cycleIndex = "0";
+          // Set the initial color.
+          pixel.style.backgroundColor = cycleStates[0];
+
+          // On mouseover, cycle through the states.
+          pixel.addEventListener("mouseover", function() {
+            const states = JSON.parse(this.dataset.states);
+            let index = parseInt(this.dataset.cycleIndex, 10);
+            index = (index + 1) % states.length;
+            this.dataset.cycleIndex = index.toString();
+            this.style.backgroundColor = states[index];
+          });
+
+          // Add hover effects with 500ms transition.
+          pixel.addEventListener("mouseenter", function() {
+            this.style.opacity = HOVER_OPACITY;
+            this.style.transform = "scale(" + HOVER_SCALE + ")";
+          });
+          pixel.addEventListener("mouseleave", function() {
+            this.style.opacity = "1";
+            this.style.transform = "scale(1)";
+          });
+
+          canvas.appendChild(pixel);
+        }
+      }
+    }
+
+    /******** Initialize the ASCII Layers Using Figlet ********/
+    function initLayers() {
+      fetch("https://raw.githubusercontent.com/patorjk/figlet.js/refs/heads/main/fonts/ANSI%20Regular.flf")
+        .then(response => response.text())
+        .then(fontData => {
+          const fig = new Figlet();
+          fig.load(fontData);
+          // Generate ASCII art for both layers.
+          const asciiText1 = fig.getText(textLayer01);
+          const asciiText2 = fig.getText(textLayer02);
+
+          // Split the ASCII art into lines and remove empty lines.
+          let layer1 = asciiText1.split("\n").filter(line => line.trim().length > 0);
+          let layer2 = asciiText2.split("\n").filter(line => line.trim().length > 0);
+
+          // Determine maximum dimensions.
+          const rows = Math.max(layer1.length, layer2.length);
+          const cols = Math.max(...layer1.map(line => line.length), ...layer2.map(line => line.length));
+
+          // Pad both layers so they have the same dimensions.
+          asciiLayer01 = padAsciiArray(layer1, rows, cols);
+          asciiLayer02 = padAsciiArray(layer2, rows, cols);
+
+          // Render the canvas.
+          renderCanvas();
+        })
+        .catch(error => console.error("Error loading font:", error));
+    }
+
+    // Initialize and render.
+    initLayers();
+
+    // Re-render when the window is resized.
+    window.addEventListener("resize", renderCanvas);
+  </script>
+</body>
+</html>

@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Pixel Art: HELLO</title>
+  <style>
+    /* Container for our pixel art */
+    #pixelCanvas {
+      position: relative;
+      width: 600px;
+      height: 400px;
+      border: 1px solid #333;
+      margin: 20px;
+    }
+    .pixel {
+      position: absolute;
+      box-sizing: border-box;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<div id="pixelCanvas"></div>
+
+<script>
+  // Pixel size in px
+  const PIXEL_SIZE = 40;
+
+  // Canvas dimensions (in pixels, must be multiples of PIXEL_SIZE)
+  const CANVAS_WIDTH = 1200;
+  const CANVAS_HEIGHT = 400;
+  
+  // Number of columns and rows based on pixel size
+  const COLS = CANVAS_WIDTH / PIXEL_SIZE;   // 120
+  const ROWS = CANVAS_HEIGHT / PIXEL_SIZE;  // 80
+
+  // Define a simple 5x7 “font” for the letters H, E, L, O
+  // Using 'X' to mark where the pixel should be white.
+  // Each array is 7 rows (strings), each row is 5 characters wide.
+  const LETTERS = {
+    'H': [
+      "X   X",
+      "X   X",
+      "X   X",
+      "XXXXX",
+      "X   X",
+      "X   X",
+      "X   X"
+    ],
+    'E': [
+      "XXXXX",
+      "X    ",
+      "X    ",
+      "XXXX ",
+      "X    ",
+      "X    ",
+      "XXXXX"
+    ],
+    'L': [
+      "X    ",
+      "X    ",
+      "X    ",
+      "X    ",
+      "X    ",
+      "X    ",
+      "XXXXX"
+    ],
+    'O': [
+      " XXX ",
+      "X   X",
+      "X   X",
+      "X   X",
+      "X   X",
+      "X   X",
+      " XXX "
+    ]
+  };
+
+  // Which letters to draw
+  const WORD = ["H", "E", "L", "L", "O"];
+
+  // Starting top-left position in the grid for the first letter
+  // (in terms of "pixel coordinates", not CSS pixels).
+  const START_COL = 0;
+  const START_ROW = 2;
+  // Space (in columns) allocated per letter to avoid overlap:
+  const LETTER_SPACING = 6; // each letter is 5 wide, plus 1 column as spacing
+
+  // Create the pixel canvas
+  const canvas = document.getElementById("pixelCanvas");
+
+  // A helper 2D array (or map) that tells us if a position is part of HELLO (white) or not (black).
+  // Initialize all false (black).
+  const isWhite = [];
+  for (let r = 0; r < ROWS; r++) {
+    isWhite[r] = [];
+    for (let c = 0; c < COLS; c++) {
+      isWhite[r][c] = false; // black
+    }
+  }
+
+  // Fill in the “HELLO” letters in our isWhite array
+  WORD.forEach((letter, index) => {
+    const pattern = LETTERS[letter];
+    // The leftmost column of this letter
+    const letterCol = START_COL + index * LETTER_SPACING;
+    // Place the 5×7 letter pattern
+    for (let row = 0; row < pattern.length; row++) {
+      const line = pattern[row];
+      for (let col = 0; col < line.length; col++) {
+        if (line[col] === 'X') {
+          const rr = START_ROW + row;
+          const cc = letterCol + col;
+          // Safely check boundaries
+          if (rr >= 0 && rr < ROWS && cc >= 0 && cc < COLS) {
+            isWhite[rr][cc] = true;
+          }
+        }
+      }
+    }
+  });
+
+  // Now create all pixel divs and attach them to the container
+  for (let row = 0; row < ROWS; row++) {
+    for (let col = 0; col < COLS; col++) {
+      const pixel = document.createElement("div");
+      pixel.className = "pixel";
+
+      // Position each pixel
+      pixel.style.top = (row * PIXEL_SIZE) + "px";
+      pixel.style.left = (col * PIXEL_SIZE) + "px";
+      pixel.style.width = PIXEL_SIZE + "px";
+      pixel.style.height = PIXEL_SIZE + "px";
+
+      // Set initial background color
+      const color = isWhite[row][col] ? "white" : "black";
+      pixel.style.backgroundColor = color;
+
+      // We can store row,col in data attributes to toggle later
+      pixel.dataset.row = row;
+      pixel.dataset.col = col;
+
+      // Toggle color on mouseover
+      pixel.addEventListener("mouseover", function() {
+        const r = parseInt(this.dataset.row);
+        const c = parseInt(this.dataset.col);
+        // Flip the boolean
+        isWhite[r][c] = !isWhite[r][c];
+        this.style.backgroundColor = isWhite[r][c] ? "white" : "black";
+      });
+
+      canvas.appendChild(pixel);
+    }
+  }
+</script>
+
+</body>
+</html>

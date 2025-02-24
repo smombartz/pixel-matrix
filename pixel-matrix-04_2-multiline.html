@@ -1,0 +1,320 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Layered Pixel Art – Three Layers with Fixed Pixels, Wrapping, Fill Option, and Controls</title>
+  <style>
+    /* The container fills the viewport */
+    .container {
+      width: 100%;
+      height: 90vh; /* Leave room for buttons */
+      position: relative;
+      overflow: hidden;
+    }
+    /* The pixel canvas is positioned relative inside the container */
+    #pixelCanvas {
+      position: relative;
+      margin: 0 auto;
+    }
+    .pixel {
+      position: absolute;
+      box-sizing: border-box;
+      cursor: pointer;
+      transition: transform 500ms, opacity 500ms;
+    }
+    /* Controls container styling */
+    #controls {
+      text-align: center;
+      margin-top: 10px;
+    }
+    #controls button {
+      margin: 0 5px;
+      padding: 10px 15px;
+      font-size: 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div id="pixelCanvas"></div>
+  </div>
+  <div id="controls">
+    <button id="btnLayer1">Show Layer 1</button>
+    <button id="btnLayer2">Show Layer 2</button>
+    <button id="btnLayer3">Show Layer 3</button>
+  </div>
+  
+  <!-- Include Figlet.js – ensure figlet.js is accessible -->
+  <script src="figlet.js" defer></script>
+  <!-- (Optional Multiplayer Scripts) -->
+  
+  <script>
+    /******** Configuration Variables ********/
+    // Three texts for our three layers.
+    const textLayer01 = "HELLYO";  // layer01: black text on white bg
+    const textLayer02 = "WORLD";   // layer02: red text on white bg
+    const textLayer03 = "Yes Mo";  // layer03: dark green text on light green bg
+
+    // Color definitions for each layer.
+    const L1_LTR = "black";
+    const L1_BG  = "white";
+    const L2_LTR = "red";
+    const L2_BG  = "white";
+    const L3_LTR = "darkgreen";
+    const L3_BG  = "lightgreen";
+
+    // Fixed pixel size and gap between rows (for wrapping in non-fill mode)
+    const PIXEL_SIZE = 24; 
+    const ROW_GAP = 4; 
+
+    // Extra border thickness in pixel blocks (extra rows/columns around the art)
+    const BORDER_THICKNESS = 1;
+
+    // Option to fill the entire container with pixels.
+    const FILL_OPTION = true;
+
+    // Option to wrap ascii art if too wide.
+    const WRAP_OPTION = true;
+
+    /******** Global Variables ********/
+    const canvas = document.getElementById("pixelCanvas");
+    const container = document.querySelector(".container");
+
+    // These will store the final ascii art arrays for each layer.
+    let asciiLayer01 = [];
+    let asciiLayer02 = [];
+    let asciiLayer03 = [];
+    let artRows = 0, artCols = 0;
+
+    /******** Utility: Pad an ASCII art array to a specified number of rows and columns ********/
+    function padAsciiArray(asciiArray, rows, cols) {
+      let padded = [];
+      for (let r = 0; r < rows; r++) {
+        let line = r < asciiArray.length ? asciiArray[r] : "";
+        if (line.length < cols) {
+          line = line.padEnd(cols, " ");
+        }
+        padded.push(line);
+      }
+      return padded;
+    }
+
+    /******** Utility: Wrap ASCII Art without breaking mid-letter ********/
+    // This function attempts to break each ascii art block only at a column where every line is blank.
+    function wrapAsciiArt(asciiLines, maxCols, rowGap) {
+      let wrapped = [];
+      const H = asciiLines.length;
+      const originalWidth = asciiLines[0].length;
+      let start = 0;
+      while (start < originalWidth) {
+        let desiredEnd = Math.min(originalWidth, start + maxCols);
+        let breakCol = desiredEnd;
+        let foundBreak = false;
+        for (let col = desiredEnd; col > start; col--) {
+          let valid = true;
+          for (let i = 0; i < H; i++) {
+            if (asciiLines[i][col] !== " ") { valid = false; break; }
+          }
+          if (valid) {
+            breakCol = col;
+            foundBreak = true;
+            break;
+          }
+        }
+        if (!foundBreak) { breakCol = desiredEnd; }
+        for (let i = 0; i < H; i++) {
+          wrapped.push(asciiLines[i].slice(start, breakCol));
+        }
+        start = breakCol;
+        if (start < originalWidth) {
+          for (let g = 0; g < rowGap; g++) {
+            wrapped.push(""); // gap row as empty string
+          }
+        }
+      }
+      return wrapped;
+    }
+
+    /******** Render the Responsive Pixel Grid ********/
+    function renderCanvas() {
+      if (!asciiLayer01.length || !asciiLayer02.length || !asciiLayer03.length) return;
+
+      artRows = asciiLayer01.length;
+      artCols = asciiLayer01[0].length;
+
+      let gridCols, gridRows, xOffset = 0, yOffset = 0;
+      if (FILL_OPTION) {
+        gridCols = Math.floor(container.clientWidth / PIXEL_SIZE);
+        gridRows = Math.floor(container.clientHeight / PIXEL_SIZE);
+        xOffset = Math.floor((gridCols - artCols) / 2);
+        yOffset = Math.floor((gridRows - artRows) / 2);
+      } else {
+        gridCols = artCols + 2 * BORDER_THICKNESS;
+        gridRows = artRows + 2 * BORDER_THICKNESS;
+      }
+
+      canvas.style.width = (gridCols * PIXEL_SIZE) + "px";
+      canvas.style.height = (gridRows * PIXEL_SIZE) + "px";
+      canvas.innerHTML = "";
+
+      function getTop(row) {
+        if (!FILL_OPTION && row >= BORDER_THICKNESS && row < BORDER_THICKNESS + artRows) {
+          let artRow = row - BORDER_THICKNESS;
+          return (row * PIXEL_SIZE) + (artRow * ROW_GAP);
+        }
+        return row * PIXEL_SIZE;
+      }
+
+      for (let r = 0; r < gridRows; r++) {
+        for (let c = 0; c < gridCols; c++) {
+          const pixel = document.createElement("div");
+          pixel.className = "pixel";
+          pixel.style.width = PIXEL_SIZE + "px";
+          pixel.style.height = PIXEL_SIZE + "px";
+          pixel.style.left = (c * PIXEL_SIZE) + "px";
+          pixel.style.top = getTop(r) + "px";
+
+          let cycleStates = [];
+          if (!FILL_OPTION) {
+            if (r < BORDER_THICKNESS || r >= BORDER_THICKNESS + artRows ||
+                c < BORDER_THICKNESS || c >= BORDER_THICKNESS + artCols) {
+              cycleStates = [L1_BG, L2_BG, L3_BG];
+            } else {
+              const artRow = r - BORDER_THICKNESS;
+              const artCol = c - BORDER_THICKNESS;
+              // For each layer, if the ascii art row is empty, force its bg color.
+              const state1 = asciiLayer01[artRow].trim() === "" ? L1_BG 
+                           : (asciiLayer01[artRow][artCol] !== " " ? L1_LTR : L1_BG);
+              const state2 = asciiLayer02[artRow].trim() === "" ? L2_BG 
+                           : (asciiLayer02[artRow][artCol] !== " " ? L2_LTR : L2_BG);
+              const state3 = asciiLayer03[artRow].trim() === "" ? L3_BG 
+                           : (asciiLayer03[artRow][artCol] !== " " ? L3_LTR : L3_BG);
+              cycleStates = [state1, state2, state3];
+            }
+          } else {
+            if (r >= yOffset && r < yOffset + artRows &&
+                c >= xOffset && c < xOffset + artCols) {
+              const artRow = r - yOffset;
+              const artCol = c - xOffset;
+              const state1 = asciiLayer01[artRow].trim() === "" ? L1_BG 
+                           : (asciiLayer01[artRow][artCol] !== " " ? L1_LTR : L1_BG);
+              const state2 = asciiLayer02[artRow].trim() === "" ? L2_BG 
+                           : (asciiLayer02[artRow][artCol] !== " " ? L2_LTR : L2_BG);
+              const state3 = asciiLayer03[artRow].trim() === "" ? L3_BG 
+                           : (asciiLayer03[artRow][artCol] !== " " ? L3_LTR : L3_BG);
+              cycleStates = [state1, state2, state3];
+            } else {
+              cycleStates = [L1_BG, L2_BG, L3_BG];
+            }
+          }
+
+          pixel.dataset.states = JSON.stringify(cycleStates);
+          pixel.dataset.cycleIndex = "0";
+          pixel.style.backgroundColor = cycleStates[0];
+          pixel.dataset.row = r;
+          pixel.dataset.col = c;
+
+          pixel.addEventListener("mouseover", function() {
+            const states = JSON.parse(this.dataset.states);
+            let index = parseInt(this.dataset.cycleIndex, 10);
+            index = (index + 1) % states.length;
+            this.dataset.cycleIndex = index.toString();
+            this.style.backgroundColor = states[index];
+
+            const eventData = {
+              row: parseInt(this.dataset.row, 10),
+              col: parseInt(this.dataset.col, 10),
+              color: states[index],
+              cycleIndex: this.dataset.cycleIndex
+            };
+            const evt = new CustomEvent("localPixelChanged", { detail: eventData });
+            document.dispatchEvent(evt);
+          });
+
+          pixel.addEventListener("mouseenter", function() {
+            this.style.opacity = HOVER_OPACITY;
+            this.style.transform = "scale(" + HOVER_SCALE + ")";
+          });
+          pixel.addEventListener("mouseleave", function() {
+            this.style.opacity = "1";
+            this.style.transform = "scale(1)";
+          });
+
+          canvas.appendChild(pixel);
+        }
+      }
+    }
+
+    /******** Initialize the ASCII Layers Using Figlet ********/
+    function initLayers() {
+      fetch("https://raw.githubusercontent.com/patorjk/figlet.js/refs/heads/main/fonts/ANSI%20Regular.flf")
+        .then(response => response.text())
+        .then(fontData => {
+          const fig = new Figlet();
+          fig.load(fontData);
+          const asciiText1 = fig.getText(textLayer01);
+          const asciiText2 = fig.getText(textLayer02);
+          const asciiText3 = fig.getText(textLayer03);
+          let layer1 = asciiText1.split("\n").filter(line => line.trim().length > 0);
+          let layer2 = asciiText2.split("\n").filter(line => line.trim().length > 0);
+          let layer3 = asciiText3.split("\n").filter(line => line.trim().length > 0);
+
+          const rows = Math.max(layer1.length, layer2.length, layer3.length);
+          const cols = Math.max(
+            ...layer1.map(line => line.length),
+            ...layer2.map(line => line.length),
+            ...layer3.map(line => line.length)
+          );
+
+          layer1 = padAsciiArray(layer1, rows, cols);
+          layer2 = padAsciiArray(layer2, rows, cols);
+          layer3 = padAsciiArray(layer3, rows, cols);
+
+          if (WRAP_OPTION) {
+            let maxArtCols = Math.floor(container.clientWidth / PIXEL_SIZE) - 2 * BORDER_THICKNESS;
+            if (cols > maxArtCols) {
+              layer1 = wrapAsciiArt(layer1, maxArtCols, 4);
+              layer2 = wrapAsciiArt(layer2, maxArtCols, 4);
+              layer3 = wrapAsciiArt(layer3, maxArtCols, 4);
+            }
+          }
+
+          asciiLayer01 = layer1;
+          asciiLayer02 = layer2;
+          asciiLayer03 = layer3;
+          artRows = asciiLayer01.length;
+          artCols = Math.max(...asciiLayer01.map(line => line.length));
+          renderCanvas();
+        })
+        .catch(error => console.error("Error loading font:", error));
+    }
+
+    initLayers();
+    window.addEventListener("resize", renderCanvas);
+
+    /******** Control Buttons ********/
+    // Add event listeners to the three buttons to force all pixels to a specific layer.
+    document.addEventListener("DOMContentLoaded", () => {
+      const btnLayer1 = document.getElementById("btnLayer1");
+      const btnLayer2 = document.getElementById("btnLayer2");
+      const btnLayer3 = document.getElementById("btnLayer3");
+
+      function setAllPixelsToLayer(layerIndex) {
+        const pixels = document.getElementsByClassName("pixel");
+        for (let pixel of pixels) {
+          const states = JSON.parse(pixel.dataset.states);
+          if (layerIndex < states.length) {
+            pixel.dataset.cycleIndex = layerIndex.toString();
+            pixel.style.backgroundColor = states[layerIndex];
+          }
+        }
+      }
+
+      btnLayer1.addEventListener("click", () => setAllPixelsToLayer(0));
+      btnLayer2.addEventListener("click", () => setAllPixelsToLayer(1));
+      btnLayer3.addEventListener("click", () => setAllPixelsToLayer(2));
+    });
+  </script>
+</body>
+</html>
